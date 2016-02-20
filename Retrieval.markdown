@@ -7,6 +7,9 @@
     + $ne.
     + OR Queries.
     + NOT Operator.
+    + $and and $nor Operators.
+3. Type Specific Queries.
+4. Regular expressions.
 
 
 
@@ -167,3 +170,71 @@ $mod takes 2 values in the array.
     db.sample.insert([{id:1},{id:2}]);
     db.sample.find({id:{$not:{$mod:[5,1]},$exists:1}});
     { "_id" : ObjectId("56c818e2db13da086828b41b"), "id" : 2 }
+### AND and NOR Operators:
+-----
++ AND, OR and NOR are used as the top level operators.
++ All the above three operators are used in the similar way.
+
+## Type Specific Queries:
+
+### null
+----------
+
++ null picks up null values for the keys as well the documents with no specified keys.
+
++ Use $exists along with $in to get the documents which has null valued keys.
+
+##### Example:
+     db.sample.insert([{id:null},{}]);
+     db.sample.find();
+    { "_id" : ObjectId("56c804b9db13da086828b414"), "name" : "h", "ids" : [ 1, 2, 3 ], "department" : "A" }
+    { "_id" : ObjectId("56c804b9db13da086828b415"), "name" : "n", "ids" : [ 3, 4, 5 ], "department" : "A" }
+    { "_id" : ObjectId("56c804b9db13da086828b416"), "name" : "m", "ids" : [ 4, 5, 6 ], "department" : "A" }
+    { "_id" : ObjectId("56c804b9db13da086828b417"), "name" : "h", "ids" : [ 1, 3, 4 ], "department" : "B" }
+    { "_id" : ObjectId("56c808d2db13da086828b418"), "name" : "t", "fullname" : "t", "ids" : [ 5, 6, 7 ] }
+    { "_id" : ObjectId("56c818e2db13da086828b41b"), "id" : 2 }
+    { "_id" : ObjectId("56c8190cdb13da086828b41c"), "id" : 1 }
+    { "_id" : ObjectId("56c897e1db13da086828b41d"), "id" : null }
+    { "_id" : ObjectId("56c897e1db13da086828b41e") }
+
+    db.sample.find({id:null});
+    { "_id" : ObjectId("56c804b9db13da086828b414"), "name" : "h", "ids" : [ 1, 2, 3 ], "department" : "A" }
+    { "_id" : ObjectId("56c804b9db13da086828b415"), "name" : "n", "ids" : [ 3, 4, 5 ], "department" : "A" }
+    { "_id" : ObjectId("56c804b9db13da086828b416"), "name" : "m", "ids" : [ 4, 5, 6 ], "department" : "A" }
+    { "_id" : ObjectId("56c804b9db13da086828b417"), "name" : "h", "ids" : [ 1, 3, 4 ], "department" : "B" }
+    { "_id" : ObjectId("56c808d2db13da086828b418"), "name" : "t", "fullname" : "t", "ids" : [ 5, 6, 7 ] }
+    { "_id" : ObjectId("56c897e1db13da086828b41d"), "id" : null }
+    { "_id" : ObjectId("56c897e1db13da086828b41e") }
+
+    db.sample.find({id:{$in:[null],$exists:true}});
+    { "_id" : ObjectId("56c897e1db13da086828b41d"), "id" : null }
+
+## Regular Expressions:
+
++ used for regex matches.
++ used for case insensitive matches.
+
+##### Examples:
+    db.sample.drop();
+    db.sample.insert([{name:"ADBc"},{name:"Adbc"},{name:"AdB"}]);
+
+    db.sample.find({name:/adbc/i});
+    { "_id" : ObjectId("56c89aacdb13da086828b423"), "name" : "ADBc" }
+    { "_id" : ObjectId("56c89aacdb13da086828b424"), "name" : "Adbc" }
+
+    db.sample.find({name:/adbc?/i}); //Will match all the documents.
+    { "_id" : ObjectId("56c89a5bdb13da086828b421"), "name" : "AdB" }
+    { "_id" : ObjectId("56c89aacdb13da086828b423"), "name" : "ADBc" }
+    { "_id" : ObjectId("56c89aacdb13da086828b424"), "name" : "Adbc" }
+
+    db.sample.find({name:/ADBc/}); //should match only one document
+    { "_id" : ObjectId("56c89aacdb13da086828b423"), "name" : "ADBc" }
+
++ used to match the regex stored directly in the DB(Though very often).
+##### Example
+    db.sample.insert({"name" : /baz/})
+    db.foo.find({"name" : /baz/})
+    {
+        "_id" : ObjectId("4b23c3ca7525f35f94b60a2d"),
+        "name" : /baz/
+    }
