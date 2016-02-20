@@ -3,6 +3,10 @@
 ### Index
 1. Find and FindOne
 2. $ Conditions
+    + Comparision Operators.
+    + $ne.
+    + OR Queries.
+    + NOT Operator.
 
 
 
@@ -59,6 +63,107 @@ FindOne will give only one document.
         }]);
 
         db.sample.find({ids:3,department:"A"});
-        
+
         { "_id" : ObjectId("56c804b9db13da086828b414"), "name" : "h", "ids" : [ 1, 2, 3 ], "department" : "A" }
         { "_id" : ObjectId("56c804b9db13da086828b415"), "name" : "n", "ids" : [ 3, 4, 5 ], "department" : "A" }
+
++ Specifying Which keys to Return
+
+    Specify the required keys as a document in the find query.
+    + set 1 to return the key.
+    + set 0 explicitly to not to return a key.
+    + _id key will be returned by default. Set 0 on _id to hard stop it.
+
+    ##### Example:
+        db.sample.find({ids:3},{department:1});
+        { "_id" : ObjectId("56c804b9db13da086828b414"), "department" : "A" }
+        { "_id" : ObjectId("56c804b9db13da086828b415"), "department" : "A" }
+        { "_id" : ObjectId("56c804b9db13da086828b417"), "department" : "B" }
+
+        db.sample.find({ids:3},{department:1,_id:0});
+        { "department" : "A" }
+        { "department" : "A" }
+        { "department" : "B" }
+
+### Limitations:
+
++ the value of the query document keys should be constants.It can be normal variable in the code.
++  It cannot refer another key of the same or other document.
+
+        db.sample.find({"name":"this.fullname"}); //Does not work.
+
+        Hint: Where clauses should be used for this.
+
+## 2. $ Conditionals:
+
+### Comparision Operators:
+----------
+
++ $lt, $le, $ge, $gt are used for comparision operations <, <=, >=, > to respectively.
++ These operations can be combined to get the range or desired results.
+
+##### Example
+    db.sample.find({ids:{$lt:4}}); //Picks up all the documents which has one of the ids less than 4
+    { "_id" : ObjectId("56c804b9db13da086828b414"), "name" : "h", "ids" : [ 1, 2, 3 ], "department" : "A" }
+    { "_id" : ObjectId("56c804b9db13da086828b415"), "name" : "n", "ids" : [ 3, 4, 5 ], "department" : "A" }
+    { "_id" : ObjectId("56c804b9db13da086828b417"), "name" : "h", "ids" : [ 1, 3, 4 ], "department" : "B" }.
+
+    db.sample.find({ids:{$lt:4,$gt:3}}); //picks up all the documents which has one of the ids less than 4 and greater than 3.
+    //Todo.
+
+
++ queries on date generally use comparision operators as the every document use millisecond precision while insertion.
+
+### $ne
+ ----------------
+ + $ne is used for "not equal".
+ ##### example
+    db.sample.find({ids:{$ne:3}}); //all the documents with no 3 as one of the values of ids.
+    { "_id" : ObjectId("56c804b9db13da086828b416"), "name" : "m", "ids" : [ 4, 5, 6 ], "department" : "A" }
+    { "_id" : ObjectId("56c808d2db13da086828b418"), "name" : "t", "fullname" : "t", "ids" : [ 5, 6, 7 ] }
+
+### OR Queries
+--------------
+There are 2 ways to do OR queries in mongo.
++ $or  [gives a 'or' condition on multiple keys]
++ $in($nin)  [gives a 'or' condition on single key.]
+
+$or can be used along with $in($nin).
+$or and $in($nin) both takes an array.
+
+##### Examples:
+    db.sample.find({department:{$in:["A","B"]}});
+    { "_id" : ObjectId("56c804b9db13da086828b414"), "name" : "h", "ids" : [ 1, 2, 3 ], "department" : "A" }
+    { "_id" : ObjectId("56c804b9db13da086828b415"), "name" : "n", "ids" : [ 3, 4, 5 ], "department" : "A" }
+    { "_id" : ObjectId("56c804b9db13da086828b416"), "name" : "m", "ids" : [ 4, 5, 6 ], "department" : "A" }
+    { "_id" : ObjectId("56c804b9db13da086828b417"), "name" : "h", "ids" : [ 1, 3, 4 ], "department" : "B" }
+
+    db.sample.find({department:{$nin:["A"]}}); //It retrives documents with out department key as well.
+    { "_id" : ObjectId("56c804b9db13da086828b417"), "name" : "h", "ids" : [ 1, 3, 4 ], "department" : "B" }
+    { "_id" : ObjectId("56c808d2db13da086828b418"), "name" : "t", "fullname" : "t", "ids" : [ 5, 6, 7 ] }
+
+    Using Exists along with or operators to filter no key values.
+
+    db.sample.find({department:{$nin:["A"],$exists:1}}); //returns only the documents with has department key and department value not equal to "A".
+    { "_id" : ObjectId("56c804b9db13da086828b417"), "name" : "h", "ids" : [ 1, 3, 4 ], "department" : "B" }
+
+    db.sample.find({$or:[{department:{$in:["A","B"]}},{ids:7}]});
+    { "_id" : ObjectId("56c804b9db13da086828b414"), "name" : "h", "ids" : [ 1, 2, 3 ], "department" : "A" }
+    { "_id" : ObjectId("56c804b9db13da086828b415"), "name" : "n", "ids" : [ 3, 4, 5 ], "department" : "A" }
+    { "_id" : ObjectId("56c804b9db13da086828b416"), "name" : "m", "ids" : [ 4, 5, 6 ], "department" : "A" }
+    { "_id" : ObjectId("56c804b9db13da086828b417"), "name" : "h", "ids" : [ 1, 3, 4 ], "department" : "B" }
+    { "_id" : ObjectId("56c808d2db13da086828b418"), "name" : "t", "fullname" : "t", "ids" : [ 5, 6, 7 ] }
+
+### Not Operator:
+-----------
++ Cannot be used as top level operator.
++ Can take only regex or a document.
++ Useful mostly in regex.
+
+$mod takes 2 values in the array.
+   + first value is the divider.
+   + second value is the remainder.
+##### Example:
+    db.sample.insert([{id:1},{id:2}]);
+    db.sample.find({id:{$not:{$mod:[5,1]},$exists:1}});
+    { "_id" : ObjectId("56c818e2db13da086828b41b"), "id" : 2 }
