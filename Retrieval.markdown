@@ -125,7 +125,7 @@ FindOne will give only one document.
  ----------------
  + $ne is used for "not equal".
 
- ##### example
+##### Example:
     db.sample.find({ids:{$ne:3}}); //all the documents with no 3 as one of the values of ids.
     { "_id" : ObjectId("56c804b9db13da086828b416"), "name" : "m", "ids" : [ 4, 5, 6 ], "department" : "A" }
     { "_id" : ObjectId("56c808d2db13da086828b418"), "name" : "t", "fullname" : "t", "ids" : [ 5, 6, 7 ] }
@@ -272,8 +272,10 @@ $mod takes 2 values in the array.
     { "_id" : ObjectId("56c8a043db13da086828b427"), "name" : "c", "ids" : [ 2, 4, 6 ] }
 
 + However the above queries work in a different way if the query invloves more than 1 key. It will return documents where even one condition is satified.
+
 #### GENERAL THUMB RULE FOR ARRAYS:
      If a field contains an array and query has multiple conditional operators, the field as a whole will match if either a single array element meets the conditions or a combination of array elements meet the conditions.
+     
 + Some of the unexpected behaviours while using normal queries on array are mentioned below.
 
 ##### Examples:
