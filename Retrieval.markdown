@@ -10,8 +10,12 @@
     + $and and $nor Operators.
 3. Type Specific Queries.
 4. Regular expressions.
-
-
+5. Querying Arrays.
+    + scalar queries on arrays.
+    + $all(does not follow order).
+    + Query for exact order.
+    + $size.
+    + $slice.
 
 ## 1. Find and FindOne
 
@@ -120,6 +124,7 @@ FindOne will give only one document.
 ### $ne
  ----------------
  + $ne is used for "not equal".
+
  ##### example
     db.sample.find({ids:{$ne:3}}); //all the documents with no 3 as one of the values of ids.
     { "_id" : ObjectId("56c804b9db13da086828b416"), "name" : "m", "ids" : [ 4, 5, 6 ], "department" : "A" }
@@ -166,10 +171,12 @@ $or and $in($nin) both takes an array.
 $mod takes 2 values in the array.
    + first value is the divider.
    + second value is the remainder.
+
 ##### Example:
     db.sample.insert([{id:1},{id:2}]);
     db.sample.find({id:{$not:{$mod:[5,1]},$exists:1}});
     { "_id" : ObjectId("56c818e2db13da086828b41b"), "id" : 2 }
+
 ### AND and NOR Operators:
 -----
 + AND, OR and NOR are used as the top level operators.
@@ -231,6 +238,7 @@ $mod takes 2 values in the array.
     { "_id" : ObjectId("56c89aacdb13da086828b423"), "name" : "ADBc" }
 
 + used to match the regex stored directly in the DB(Though very often).
+
 ##### Example
     db.sample.insert({"name" : /baz/})
     db.foo.find({"name" : /baz/})
@@ -238,3 +246,152 @@ $mod takes 2 values in the array.
         "_id" : ObjectId("4b23c3ca7525f35f94b60a2d"),
         "name" : /baz/
     }
+
+## Querying Arrays:
+
+### Scalar Queries on arrays:
+--------
+
++ querying arrays can work similar to scalars in few cases.
+
+##### Example
+    db.sample.drop();
+    db.sample.insert([{
+        name:"a",
+        ids:[1,2,3]
+    },{
+        name:"b",
+        ids:[3,4,5]
+    },{
+        name: "c",
+        ids: [2,4,6]
+    }]);
+
+    db.sample.find({ids:2});
+    { "_id" : ObjectId("56c8a043db13da086828b425"), "name" : "a", "ids" : [ 1, 2, 3 ] }
+    { "_id" : ObjectId("56c8a043db13da086828b427"), "name" : "c", "ids" : [ 2, 4, 6 ] }
+
++ However the above queries work in a different way if the query invloves more than 1 key. It will return documents where even one condition is satified.
+#### GENERAL THUMB RULE FOR ARRAYS:
+     If a field contains an array and query has multiple conditional operators, the field as a whole will match if either a single array element meets the conditions or a combination of array elements meet the conditions.
++ Some of the unexpected behaviours while using normal queries on array are mentioned below.
+
+##### Examples:
+    db.sample.find();
+    { "_id" : ObjectId("56c8a043db13da086828b425"), "name" : "a", "ids" : [ 1, 2, 3 ] }
+    { "_id" : ObjectId("56c8a043db13da086828b426"), "name" : "b", "ids" : [ 3, 4, 5 ] }
+    { "_id" : ObjectId("56c8a043db13da086828b427"), "name" : "c", "ids" : [ 2, 4, 6 ] }
+
+    db.sample.find({ids:{$lt:3,$gt:2}});
+    GENERAL EXPECTATION: No documents should be returned.
+    ACTUAL RESULT:
+    { "_id" : ObjectId("56c8a043db13da086828b425"), "name" : "a", "ids" : [ 1, 2, 3 ] }
+    { "_id" : ObjectId("56c8a043db13da086828b427"), "name" : "c", "ids" : [ 2, 4, 6 ] }
+    SOLUTION: use $elemMatch for comparison operators for strict comparison on array of each document.
+    db.
+
+    db.sample.find({ids:{$elemMatch:{$lt:3,$gt:2}}});
+    //returns no documents.
+
+    db.sample.find({ids:1,ids:2});
+    //general AND operator on ids.
+    EXPECTED: returns only one documents where ids contains both 1 and 2 as the query is just normal AND operations of ids.
+    ACTUAL: returns
+    { "_id" : ObjectId("56c8a043db13da086828b425"), "name" : "a", "ids" : [ 1, 2, 3 ] }
+    { "_id" : ObjectId("56c8a043db13da086828b427"), "name" : "c", "ids" : [ 2, 4, 6 ] }
+    SOLUTION: use $all for these operations.(explained in detail in next chapters.)
+
+
+### $all
+-------
++ To match two or more keys in the same array of the documents use $all.
++ Order does not matter.
+
+##### Example:
+    db.sample.find();
+    { "_id" : ObjectId("56c8a043db13da086828b425"), "name" : "a", "ids" : [ 1, 2, 3 ] }
+    { "_id" : ObjectId("56c8a043db13da086828b426"), "name" : "b", "ids" : [ 3, 4, 5 ] }
+    { "_id" : ObjectId("56c8a043db13da086828b427"), "name" : "c", "ids" : [ 2, 4, 6 ] }
+    db.sample.find({ids:{$all:[2,3]}});
+    { "_id" : ObjectId("56c8a043db13da086828b425"), "name" : "a", "ids" : [ 1, 2, 3 ] }
+
+### Query for exact order:
+--------
+
++ use the entire array for the exact match of the array in the documents.This follows order.
++ Use DOT Operator for querying on exact index of the array key.
+
+##### Examples:
+    db.sample.drop();
+    db.sample.insert([{ids:["A","B","C"]},{ids:["A","C","B"]},{ids:["C","B","A"]}]);
+    db.sample.find({ids:["A","B","C"]});
+    { "_id" : ObjectId("56c8acb7db13da086828b428"), "ids" : [ "A", "B", "C" ] }
+
+    db.sample.find({'ids.2':"B"});
+    { "_id" : ObjectId("56c8acb7db13da086828b429"), "ids" : [ "A", "C", "B" ] }
+
+### $size
+---------
+
++ $size returns all the documents where the specified array size is matched.
++ $size operator cannot be used with any other conditional operator.
+
+##### Example:
+    db.sample.find({ids:{$size:3}});
+    { "_id" : ObjectId("56c8acb7db13da086828b428"), "ids" : [ "A", "B", "C" ] }
+    { "_id" : ObjectId("56c8acb7db13da086828b429"), "ids" : [ "A", "C", "B" ] }
+    { "_id" : ObjectId("56c8acb7db13da086828b42a"), "ids" : [ "C", "B", "A" ] }
+    db.sample.insert([{id:[1],ids:[422,2,1]}]);
+    db.sample.find({ids:{$size:3},id:{$size:1}});
+    { "_id" : ObjectId("56c8b9c4db13da086828b42e"), "id" : [ 1 ], "ids" : [ 422, 2, 1 ] }
+
+### $slice
+---------
+
++ $slice is used in the second document in the find query to get only the subset of elements from the actual list of elements in the array.
++ +n value returns the first n values of the array.
++ -n value returns the last n values of the array.
++ if n > existing number of values in the array. Only the existing number of values will be returned.
+
+
+##### Examples:
+    db.sample.find();
+    { "_id" : ObjectId("56c8acb7db13da086828b428"), "ids" : [ "A", "B", "C" ] }
+    { "_id" : ObjectId("56c8acb7db13da086828b429"), "ids" : [ "A", "C", "B" ] }
+    { "_id" : ObjectId("56c8acb7db13da086828b42a"), "ids" : [ "C", "B", "A" ] }
+    { "_id" : ObjectId("56c8b98ddb13da086828b42b"), "id" : [ 1, 2, 3 ], "ids" : [ 1, 2, 3, 4 ] }
+    { "_id" : ObjectId("56c8b98ddb13da086828b42c"), "id" : [ 1, 2 ], "ids" : [ 1, 2, 3, 4, 5 ] }
+    { "_id" : ObjectId("56c8b98ddb13da086828b42d"), "id" : [ 1 ], "ids" : [ 422, 2 ] }
+    { "_id" : ObjectId("56c8b9c4db13da086828b42e"), "id" : [ 1 ], "ids" : [ 422, 2, 1 ] }
+
+    db.sample.find({},{ids:{$slice:1}});
+    { "_id" : ObjectId("56c8acb7db13da086828b428"), "ids" : [ "A" ] }
+    { "_id" : ObjectId("56c8acb7db13da086828b429"), "ids" : [ "A" ] }
+    { "_id" : ObjectId("56c8acb7db13da086828b42a"), "ids" : [ "C" ] }
+    { "_id" : ObjectId("56c8b98ddb13da086828b42b"), "id" : [ 1,     2, 3 ], "ids" : [ 1 ] }
+    { "_id" : ObjectId("56c8b98ddb13da086828b42c"), "id" : [ 1, 2 ], "ids" : [ 1 ] }
+    { "_id" : ObjectId("56c8b98ddb13da086828b42d"), "id" : [ 1 ], "ids" : [ 422 ] }
+    { "_id" : ObjectId("56c8b9c4db13da086828b42e"), "id" : [ 1 ], "ids" : [ 422 ] }
+
+    db.sample.find({},{ids:{$slice:-4}});
+    { "_id" : ObjectId("56c8acb7db13da086828b428"), "ids" : [ "A", "B", "C" ] }
+    { "_id" : ObjectId("56c8acb7db13da086828b429"), "ids" : [ "A", "C", "B" ] }
+    { "_id" : ObjectId("56c8acb7db13da086828b42a"), "ids" : [ "C", "B", "A" ] }
+    { "_id" : ObjectId("56c8b98ddb13da086828b42b"), "id" : [ 1, 2, 3 ], "ids" : [ 1, 2, 3, 4 ] }
+    { "_id" : ObjectId("56c8b98ddb13da086828b42c"), "id" : [ 1, 2 ], "ids" : [ 2, 3, 4, 5 ] }
+    { "_id" : ObjectId("56c8b98ddb13da086828b42d"), "id" : [ 1 ], "ids" : [ 422, 2 ] }
+    { "_id" : ObjectId("56c8b9c4db13da086828b42e"), "id" : [ 1 ], "ids" : [ 422, 2, 1 ]
+
++ $slice can also get subset of the values from the middle.
++ $slice optionally take array where the first element is the starting index and second element is the count of the elements to return from the starting index.
++ first element  == index of the array.
++ second element == limit of the array.
++ limit cannot be -ve.
++ -n represent the n index from the end.
++ +n represent the n index from the start.
+
+##### Example:
+    db.sample.find({"id" : [ 1, 2, 3 ]});
+    { "_id" : ObjectId("56c8b98ddb13da086828b42b"), "id" : [ 1, 2, 3 ], "ids" : [ 1, 2, 3, 4 ] }
+    db.sample.find({"id" : [ 1, 2, 3 ]},{ids:{$slice:[2,2]}});
+    { "_id" : ObjectId("56c8b98ddb13da086828b42b"), "id" : [ 1, 2, 3 ], "ids" : [ 3, 4 ] }
