@@ -20,6 +20,9 @@
         + $elemMatch.
         + use of min and max.
 6. Querying for embedded documents.
+    + DOT Operator.
+    + $elemMatch.
+    + $where
 
 ## 1. Find and FindOne
 
@@ -491,3 +494,30 @@ $mod takes 2 values in the array.
 ##### Examples:
     db.sample.find({'comments':{$elemMatch:{name:"joe",rating:{$gt:5}}}});
     //no results.
+
+### $where
+--------
++ Used to execute random javascript code.
++ Highly inefficient.Use it only when a query can not be done using comparison and conditional operators.
+
+##### Examples:
+    db.sample.drop();
+    db.sample.insert([{mango:1,onion:2,banana:1},{mango:2,orange:2,banana:2},{banana:3,orange:4,onion:1}]);
+    //Find all the documents where any element values are equal.Can be done using conditional or comparison operators.
+    var fun = function(){
+        for(var current in this){
+            for(var other in this){
+                if(other != current && this[current] == this[other]){
+                    return true;
+                }
+            }
+        }
+        return false;
+    };
+    db.sample.find({$where:fun});
+    { "_id" : ObjectId("56c9ba1adb13da086828b43b"), "mango" : 1, "onion" : 2, "banana" : 1 }
+    { "_id" : ObjectId("56c9ba1adb13da086828b43c"), "mango" : 2, "orange" : 2, "banana" : 2 }
+
++ $where Clauses are very slow than normal find queries.
++ Each document has to be converted from BSON to javascript object and execute the js code to get the results.
++ Indexing does not work with $where clause.
