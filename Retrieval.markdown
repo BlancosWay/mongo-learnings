@@ -16,6 +16,10 @@
     + Query for exact order.
     + $size.
     + $slice.
+    + Range Query interactions.
+        + $elemMatch.
+        + use of min and max.
+6. Querying for embedded documents.
 
 ## 1. Find and FindOne
 
@@ -275,7 +279,7 @@ $mod takes 2 values in the array.
 
 #### GENERAL THUMB RULE FOR ARRAYS:
      If a field contains an array and query has multiple conditional operators, the field as a whole will match if either a single array element meets the conditions or a combination of array elements meet the conditions.
-     
+
 + Some of the unexpected behaviours while using normal queries on array are mentioned below.
 
 ##### Examples:
@@ -290,7 +294,7 @@ $mod takes 2 values in the array.
     { "_id" : ObjectId("56c8a043db13da086828b425"), "name" : "a", "ids" : [ 1, 2, 3 ] }
     { "_id" : ObjectId("56c8a043db13da086828b427"), "name" : "c", "ids" : [ 2, 4, 6 ] }
     SOLUTION: use $elemMatch for comparison operators for strict comparison on array of each document.
-    db.
+    db.However $elemMatch only works on arrays.(Explained in arrays topic).
 
     db.sample.find({ids:{$elemMatch:{$lt:3,$gt:2}}});
     //returns no documents.
@@ -397,3 +401,93 @@ $mod takes 2 values in the array.
     { "_id" : ObjectId("56c8b98ddb13da086828b42b"), "id" : [ 1, 2, 3 ], "ids" : [ 1, 2, 3, 4 ] }
     db.sample.find({"id" : [ 1, 2, 3 ]},{ids:{$slice:[2,2]}});
     { "_id" : ObjectId("56c8b98ddb13da086828b42b"), "id" : [ 1, 2, 3 ], "ids" : [ 3, 4 ] }
+
+### Range Query Interactions:
+-----------
++ working with comparison and conditional queries on arrays is a bit tricky.
+
+#### $elemMatch
+----------
+
++ use $elemMatch.Works only with arrays.
+
+##### Examples:
+    db.sample.drop();
+    db.sample.insert([{x:5},{x:15},{x:25},{x:[5,25]}]);
+    db.sample.find({x:{$gt:10,$lt:20}});
+    { "_id" : ObjectId("56c96971db13da086828b430"), "x" : 15 }
+    { "_id" : ObjectId("56c96971db13da086828b432"), "x" : [ 5, 25 ] }
+    db.sample.find({x:{$elemMatch:{$gt:10,$lt:20}}});
+    //No results.It does not match non array elements.
+
+#### use of min and max.
+-------------
+
++ If the required elements are indexed.We can use min and max to get the ranges.Works with non array and array elements.
+
+##### Examples:
+    db.sample.find();
+    { "_id" : ObjectId("56c96971db13da086828b42f"), "x" : 5 }
+    { "_id" : ObjectId("56c96971db13da086828b430"), "x" : 15 }
+    { "_id" : ObjectId("56c96971db13da086828b431"), "x" : 25 }
+    { "_id" : ObjectId("56c96971db13da086828b432"), "x" : [ 5, 25 ] }
+
+    db.sample.createIndex({x:1});
+    db.sample.find(x:{$lt:20,$gt:10}).max({x:20}).min({x:10});
+    { "_id" : ObjectId("56c96971db13da086828b430"), "x" : 15 }
+
++ This increases the efficiency and results in faster search.
+
+## Querying for embedded documents.
+
++ normal queries will work with embedded documents.
++ normal queries will look for full element match.
+
+##### Examples:
+    db.sample.drop();
+    db.sample.insert({content:"abc",comments:[{author:"joe",score:3,comment:"tyajhs"},{author:"mark",score:6,comment:"habsa"}]});
+    db.sample.find({comments:{author:"joe"}});
+    //no results since it matches full element match.
+    db.sample.find({comments:[{author:"joe",score:3,comment:"tyajhs"},{author:"mark",score:6,comment:"habsa"}]});
+    //should the document since it we have done the full element match.
+    { "_id" : ObjectId("56c9719adb13da086828b433"), "content" : "abc", "comments" : [ { "author" : "joe", "score" : 3, "comment" : "tyajhs" }, { "author" : "mark", "score" : 6, "comment" : "habsa" } ] }
+
++ It is often difficult to search full element for exact match everytime.It is not compatable. Suppose if some one adds new embedded key into the element. The old find query won't work anymore.
++ Use DOT method for embedded key based searched.No need of full elements search anymore.Can be used for comparision and conditional based searches as well if arrays are not involved.
++ Need to use $elemMatch for comparison and condition based searches.
+
+### DOT Method.
+--------
++ can be used for embedded key based searches.
+
+##### Examples:
+    db.sample.drop();
+    db.sample.insert([{details:{name:"joe",adr : "...."}},{details:{name:"mark",adr:"...."}}]);
+     db.sample.find({'details.name':"joe"});
+     { "_id" : ObjectId("56c97f5cdb13da086828b434"), "details" : { "name" : "joe", "adr" : "...." } }
+
++ can be used with conditional and comparison operators for non array elements.
+
+##### Examples:
+    db.sample.drop();
+    db.sample.insert([{comments:{rating:4,name:"joe"}},{comments:{name:"mark",rating:6}}]);
+    db.sample.find({'comments.rating':{$gt:5},'comments.name':"joe"});// No results.Works fine with out arrays.
+
++ comparision and condition based seaches won't work if arrays are present.Use $elemMatch for that.
+
+##### Examples:
+    db.sample.drop();
+    db.sample.insert({name:"A",comments:[{comment:"aasa",name:"joe",rating:3},{comment:"sadsa",rating:6,name:"mark"}]});
+    db.sample.find({'comments.name':"joe",'comments.rating':{$gt:5}});
+    //expected no results. But returns results.
+    { "_id" : ObjectId("56c98247db13da086828b438"), "name" : "A", "comments" : [ { "comment" : "aasa", "name" : "joe", "rating" : 3 }, { "comment" : "sadsa", "rating" : 6, "name" : "mark" } ] }
+    //Use $elemMatch.
+
+### $elemMatch
+--------
++ Not a top level operator.
++ Needs a document.
+
+##### Examples:
+    db.sample.find({'comments':{$elemMatch:{name:"joe",rating:{$gt:5}}}});
+    //no results.
